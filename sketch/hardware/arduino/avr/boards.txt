@@ -1,0 +1,45 @@
+﻿menu.cpu=Processor
+
+
+#### See: http://code.google.com/p/arduino/wiki/Platforms
+
+
+##############################################################
+
+# add this to your boards.txt file
+
+emprenda.name=Effigy Labs Control Pedal
+emprenda.vid.0=0x1209
+emprenda.pid.0=0xEFFA
+emprenda.vid.1=0x1209
+emprenda.pid.1=0xEFFE
+
+emprenda.upload.tool=avrdude
+emprenda.upload.protocol=avr109
+emprenda.upload.maximum_size=28672
+emprenda.upload.maximum_data_size=2560
+emprenda.upload.speed=57600
+emprenda.upload.disable_flushing=true
+emprenda.upload.use_1200bps_touch=true
+emprenda.upload.wait_for_upload_port=true
+
+emprenda.bootloader.tool=avrdude
+emprenda.bootloader.low_fuses=0xff
+emprenda.bootloader.high_fuses=0xd8
+emprenda.bootloader.extended_fuses=0xcb
+emprenda.bootloader.path=caterina
+emprenda.bootloader.file=Caterina-Emprenda.hex
+emprenda.bootloader.unlock_bits=0x3F
+emprenda.bootloader.lock_bits=0x2F
+
+emprenda.build.mcu=atmega32u4
+emprenda.build.f_cpu=16000000L
+emprenda.build.vid=0x1209
+emprenda.build.pid=0xEFFE
+emprenda.build.usb_product="Effigy Labs Control Pedal"
+emprenda.build.board=AVR_LEONARDO
+emprenda.build.core=arduino
+emprenda.build.variant=leonardo
+emprenda.build.extra_flags={build.usb_flags}
+
+##############################################################

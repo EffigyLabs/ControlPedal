@@ -1,0 +1,109 @@
+# See: http://code.google.com/p/arduino/wiki/Platforms
+
+menu.cpu=Processor
+menu.usb=USB Type
+menu.keys=Keyboard Layout
+
+##############################################################
+
+emprenda.name=Emprenda
+emprenda.vid.0=0x1209
+emprenda.pid.0=0xEFFE
+emprenda.vid.1=0x1209
+emprenda.pid.1=0xEFFA
+emprenda.vid.2=0x1209
+emprenda.pid.2=0xEFFE
+emprenda.vid.3=0x1209
+emprenda.pid.3=0xEFFA
+
+emprenda.upload.tool=avrdude
+emprenda.upload.protocol=avr109
+emprenda.upload.maximum_size=28672
+emprenda.upload.maximum_data_size=2560
+emprenda.upload.speed=57600
+emprenda.upload.disable_flushing=true
+emprenda.upload.use_1200bps_touch=true
+emprenda.upload.wait_for_upload_port=true
+
+emprenda.bootloader.tool=avrdude
+emprenda.bootloader.low_fuses=0xff
+emprenda.bootloader.high_fuses=0xd8
+emprenda.bootloader.extended_fuses=0xcb
+emprenda.bootloader.file=caterina/Caterina-Emprenda.hex
+emprenda.bootloader.unlock_bits=0x3F
+emprenda.bootloader.lock_bits=0x2F
+
+emprenda.build.mcu=atmega32u4
+emprenda.build.f_cpu=16000000L
+emprenda.build.vid=0x1209
+emprenda.build.pid=0xEFFE
+emprenda.build.usb_product="Effigy Labs Pedal"
+emprenda.build.board=AVR_LEONARDO
+emprenda.build.core=emprenda
+emprenda.build.variant=leonardo
+emprenda.build.extra_flags={build.usb_flags}
+emprenda.build.toolchain=hardware/tools/avr/bin/
+emprenda.build.command.g++=avr-g++
+emprenda.build.flags.optimize=-Os
+emprenda.build.flags.cpu=-mmcu=atmega32u4
+emprenda.build.flags.common=-g -Wall -ffunction-sections -fdata-sections -MMD
+emprenda.build.flags.cpp=-fno-exceptions -felide-constructors -std=c++0x
+emprenda.build.flags.defs=-DTEENSYDUINO=121
+
+emprenda.menu.usb.serial=Serial
+emprenda.menu.usb.serial.build.usbtype=USB_SERIAL
+emprenda.menu.usb.midi=MIDI
+emprenda.menu.usb.midi.build.usbtype=USB_MIDI
+emprenda.menu.usb.midi.fake_serial=teensy_gateway
+
+
+emprenda.menu.keys.en-us=US English
+emprenda.menu.keys.en-us.build.keylayout=US_ENGLISH
+emprenda.menu.keys.fr-ca=Canadian French
+emprenda.menu.keys.fr-ca.build.keylayout=CANADIAN_FRENCH
+emprenda.menu.keys.xx-ca=Canadian Multilingual
+emprenda.menu.keys.xx-ca.build.keylayout=CANADIAN_MULTILINGUAL
+emprenda.menu.keys.cz-cz=Czech
+emprenda.menu.keys.cz-cz.build.keylayout=CZECH
+emprenda.menu.keys.da-da=Danish
+emprenda.menu.keys.da-da.build.keylayout=DANISH
+emprenda.menu.keys.fi-fi=Finnish
+emprenda.menu.keys.fi-fi.build.keylayout=FINNISH
+emprenda.menu.keys.fr-fr=French
+emprenda.menu.keys.fr-fr.build.keylayout=FRENCH
+emprenda.menu.keys.fr-be=French Belgian
+emprenda.menu.keys.fr-be.build.keylayout=FRENCH_BELGIAN
+emprenda.menu.keys.fr-ch=French Swiss
+emprenda.menu.keys.fr-ch.build.keylayout=FRENCH_SWISS
+emprenda.menu.keys.de-de=German
+emprenda.menu.keys.de-de.build.keylayout=GERMAN
+emprenda.menu.keys.de-dm=German (Mac)
+emprenda.menu.keys.de-dm.build.keylayout=GERMAN_MAC
+emprenda.menu.keys.de-ch=German Swiss
+emprenda.menu.keys.de-ch.build.keylayout=GERMAN_SWISS
+emprenda.menu.keys.is-is=Icelandic
+emprenda.menu.keys.is-is.build.keylayout=ICELANDIC
+emprenda.menu.keys.en-ie=Irish
+emprenda.menu.keys.en-ie.build.keylayout=IRISH
+emprenda.menu.keys.it-it=Italian
+emprenda.menu.keys.it-it.build.keylayout=ITALIAN
+emprenda.menu.keys.no-no=Norwegian
+emprenda.menu.keys.no-no.build.keylayout=NORWEGIAN
+emprenda.menu.keys.pt-pt=Portuguese
+emprenda.menu.keys.pt-pt.build.keylayout=PORTUGUESE
+emprenda.menu.keys.pt-br=Portuguese Brazilian
+emprenda.menu.keys.pt-br.build.keylayout=PORTUGUESE_BRAZILIAN
+emprenda.menu.keys.rs-rs=Serbian (Latin Only)
+emprenda.menu.keys.rs-rs.build.keylayout=SERBIAN_LATIN_ONLY
+emprenda.menu.keys.es-es=Spanish
+emprenda.menu.keys.es-es.build.keylayout=SPANISH
+emprenda.menu.keys.es-mx=Spanish Latin America
+emprenda.menu.keys.es-mx.build.keylayout=SPANISH_LATIN_AMERICA
+emprenda.menu.keys.sv-se=Swedish
+emprenda.menu.keys.sv-se.build.keylayout=SWEDISH
+emprenda.menu.keys.tr-tr=Turkish (partial)
+emprenda.menu.keys.tr-tr.build.keylayout=TURKISH
+emprenda.menu.keys.en-gb=United Kingdom
+emprenda.menu.keys.en-gb.build.keylayout=UNITED_KINGDOM
+emprenda.menu.keys.usint=US International
+emprenda.menu.keys.usint.build.keylayout=US_INTERNATIONAL

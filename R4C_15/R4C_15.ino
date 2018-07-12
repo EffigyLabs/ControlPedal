@@ -1,6 +1,6 @@
 /* Control Program for the Effigy Labs Control Pedal
     vR4C.15
-    9 July 2018
+    12 July 2018
     author: Jody Roberts
     All rights reserved, Effigy Labs LLC
     
@@ -65,7 +65,7 @@
      - implement min-max on mapped value calculations-
 */
 // uncomment to turn on console output
-//#define DEBUG
+#define DEBUG
 
 #include <EEPROM.h>       // eeprom
 #include "MIDIUSB.h"      // midi

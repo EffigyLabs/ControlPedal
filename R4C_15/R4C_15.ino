@@ -1,6 +1,6 @@
 /* Control Program for the Effigy Labs Control Pedal
     vR4C.15
-    14 July 2018
+    23 July 2018
     author: Jody Roberts
     All rights reserved, Effigy Labs LLC
     
@@ -29,8 +29,20 @@
  	loop()
    
     read inputs
+      pin map is reversed in pin number to ota inputs
+      21 = position 1
+      20 = position 2
+      19 = position 3
+      18 = knob / position 4
     generate outputs
+      take raw input
+      determine if output should be created - do not create output if value same as last value, which smashes to the ul or ll if outside, naturally ensuring open/full gate always sent
+      apply filters of min/max/curve direction / user defined processing      
     updates/actions
+      midi input
+      mode switch input
+      led blink state
+      any other OS-like activity where time slicing must occur
     
    subroutines:
      midi output
@@ -65,6 +77,9 @@
      - implement min-max on mapped value calculations-
      - implement codes 19-21 in API to implement full control over system block settings
      - min/max inversions by min/max modifying the mapped or constrained value - ***** TAG need to create the flow for this - JR 7/13/2018 
+     - 
+     -
+     -
 */
 // uncomment to turn on console output
 #define DEBUG
@@ -121,7 +136,7 @@ boolean setOnce = false; // for condition of setting sensitivity from eeprom if 
 // min size of non-activating motion added to max idle measurement
 short porchsize = 5; // for now, here, but eeprom overrides
 // ceiling = amount of buffer to give to the upper maximum value of operation.  the minimum max sensor value is the upper limit use to set dynamic working range (dwr).  This number is subtracted from the max.  Use zero for nothing, and more to increase the ceiling buffer size.
-short ceiling = 100; // default, this number is to avoid too much stiffness at the top
+short ceiling = 100; // default, this number is to avoid too much stiffness at the top, read from eeprom
 
 // Position Array and hardware constants
 const static short numberOfInputs = 4; // set the number of position inputs on the device, OTA and knobs, but not mode switches.
@@ -162,7 +177,7 @@ int static const MIDI_CHG = 0x0B;            // midi change command - no channel
 //int static const MIDI_PKP = 0x0C;            // not implemented
 int static const MIDI_AFTERTOUCH = 0x0D;     // aftertouch
 int static const MIDI_PITCHBEND = 0x0E;      // midi pitch bend
-int static const MIDI_SYSEX = 0x0F;          // sysex maybe
+//int static const MIDI_SYSEX = 0x0F;          // sysex maybe
 
 // system configuration
 systemblock systemBlock;  // 1st 100 bytes of eeprom are reserved for system settings, leaving 924 bytes for presets.
@@ -218,9 +233,10 @@ short presetSize;
 bool full_message_received = false;
 short apimidicmd; // the API call number sent in the SysEx message representing which API function is being called.
 
+// one-time through setup() then loop() forever
 void setup() {
   Serial.begin(9600); // do not alter this even though your console might say 115200 bps
-  Serial1.begin(31250);  // MIDI DIN-5 port
+  Serial1.begin(31250);  // MIDI DIN-5 port, output only
   pinMode(pedalLedPin, OUTPUT);
   pinMode(commLedPin, OUTPUT);
   pinMode(redLedPin, OUTPUT);
@@ -228,7 +244,7 @@ void setup() {
   digitalWrite(pedalLedPin, HIGH);  // turn on emitters - give time to 'warm up'?
   analogWrite(redLedPin, HIGH);  // turn on red led lead
     
-  delay(2000); // time for emitters and sensors to level
+  delay(1600); // time for emitters and sensors to level ****** tag reduce to minimum when better calibrated
 
   // Effigy Control Pedal R4C input device array
   // input pins - only the Positions should be type 0 as they are looked at together to determine consistent working range.  knob or mode switch should not be used to calibrate Position working ranges.
@@ -262,7 +278,7 @@ void setup() {
   // load system settings from EEPROM
   EEPROM.get(0, systemBlock);
 #ifdef DEBUG
-  Serial.print("Effigy Labs Control Pedal ");
+  //Serial.print("Effigy Labs Control Pedal ");
   Serial.print("v");
   Serial.println(ver);
 #endif
@@ -331,11 +347,10 @@ void setup() {
 
 // main loop repeats forever or until reset or power off
 void loop() {
-  //countloop(); // determine sample rate
   readInputs();  // update all the current and last values
   generateOutputs(); // output signals to the ports
   updateAll(); // timers, interrupts, api work, etc.
-}
+} // loop()
 
 void readInputs() {
   for (short i = 0; i < numberOfInputs; i++) {
@@ -343,16 +358,19 @@ void readInputs() {
     analogRead(Inputs[i][PIN_COL]); // flushing read
     if (Inputs[i][TYPE_COL] == 1) delay(1); // delay for knob to cooldown internal ADC, otherwise the value is coupled to OTA3
     Inputs[i][VALUE_COL] = analogRead(Inputs[i][PIN_COL]); // good read }
+    // I thought about applying the min/max and maybe other slot parameters directly related to the input here.
+    // However I decided to just put it all in the generateOutputs for now, unless a better reason develops for simplicity or performance.
   }
 }
 
 void generateOutputs() {
   /*
-      the idea is that an idling value is constrained down to a zero open gate value, and is sent
-      then the last-value duplicate just never sends anotherr open gate-constrained value.
-      so there should be no extra action required to go to both full and open gate naturally
-      using a properly constraining map function.  The highest full gate value should always be sent when going to full gate.
-  */
+   *  Auto-open and -full gating, replacing the explicit open/full gate send in the previous version.
+   *   the idea is that an idling value is constrained down to a zero open gate value, and is sent
+   *   then the last-value duplicate just never sends anotherr open gate-constrained value.
+   *   so there should be no extra action required to go to both full and open gate naturally
+   *   using a properly constraining map function.  The highest full gate value should always be sent when going to full gate.
+   */
   //Serial.println("generateOutputs()");
   short modeIndex = mode - 1; // mode 1 is indexed by array index [0] and so on...
 
@@ -437,6 +455,7 @@ void generateOutputs() {
         }
 
         // handle min and max, these are expressed as a percentage of the full input range.  this may change if we want a 'whole' or 'smooth' operation just in the otuptu range.
+        // if the min limit is 40, when the input reaches 20%, do we start at 20%, or start at zero?  We should start at 20% otherwise the input is just really stiff.  Or is it? *** tag 07/23/2018
         // however, the latter may just create more space on the porch and not feel good.  we'll see how this goes.....02/20/2018 - jr ******
         // - may need to move this past midval generation to ensure open/full gate always sent
         short sval = Inputs[pos][VALUE_COL];
@@ -576,12 +595,12 @@ void generateOutputs() {
               sendMidiOut(
                 livePreset.mode[modeIndex].pos[pos].slot[slot].MidiCmd, // midi cmd byte, B=CC, E=pitch, D=aftertouch, etc.
                 livePreset.mode[modeIndex].pos[pos].slot[slot].MidiChannel, // midi channel, 0 = channel 1
-                livePreset.mode[modeIndex].pos[pos].slot[slot].MidiSubCommand, // pitch direction, 00=down, FF = up, or, CC command subtype, e.g. MOD, sustain, expression, etc.
+                livePreset.mode[modeIndex].pos[pos].slot[slot].MidiSubCommand, // pitch direction, 00=down, >0 = up (preferrably 1), or, CC command subtype, e.g. MOD, sustain, expression, etc.
                 midval); // output value
               // fade on position
               short chk = map(Inputs[pos][VALUE_COL], Inputs[pos][LL_COL], Inputs[pos][UL_COL],fadeSpeedMin, fadeSpeedMax);
               if (!(fadespeed == chk)) {
-                  fadespeed = map(Inputs[pos][VALUE_COL], Inputs[pos][LL_COL], Inputs[pos][UL_COL],fadeSpeedMin, fadeSpeedMax);
+                  fadespeed = chk;
               }            
             }
           }
@@ -595,9 +614,11 @@ void generateOutputs() {
 
 void report() {
 #ifdef DEBUG
-  Serial.println("I\tTP\tV\tLV\tLL\tUL");
+  Serial.println("POS\tI\tTP\tV\tLV\tLL\tUL");
 
   for (short i = 0; i < numberOfInputs; i++) {
+    Serial.print(i+1);
+    Serial.print("\t");
     for (short c = 0; c < numberOfCols; c++) {
 
       Serial.print(Inputs[i][c]);

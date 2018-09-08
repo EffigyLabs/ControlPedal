@@ -1,6 +1,8 @@
+#define DEBUG  // uncomment to turn on console output
+
 /* Control Program for the Effigy Labs Control Pedal
     vR4C.15
-    23 July 2018
+    26 July 2018
     author: Jody Roberts
     All rights reserved, Effigy Labs LLC
     
@@ -81,8 +83,6 @@
      -
      -
 */
-// uncomment to turn on console output
-#define DEBUG
 
 #include <EEPROM.h>       // eeprom
 #include "MIDIUSB.h"      // midi
@@ -277,11 +277,11 @@ void setup() {
 
   // load system settings from EEPROM
   EEPROM.get(0, systemBlock);
-#ifdef DEBUG
+//#ifdef DEBUG
   //Serial.print("Effigy Labs Control Pedal ");
   Serial.print("v");
   Serial.println(ver);
-#endif
+//#endif
 
   fademax = systemBlock.fademax;
 #ifdef DEBUG
@@ -1600,7 +1600,7 @@ void addToSysexBuffer(midiEventPacket_t block) {
   Serial.print("+");
 #endif
 
-  
+/*  
       Serial.print("blk ");
       Serial.print(blockCount);
       Serial.print("\t");
@@ -1609,7 +1609,7 @@ void addToSysexBuffer(midiEventPacket_t block) {
       Serial.print(block.byte2,HEX);
       Serial.print("\t");
       Serial.println(block.byte3,HEX);
-  
+  */
 }
 
 //}
@@ -1803,6 +1803,7 @@ void selectMode() {
   blinkCommLED(pickPositionconfirmblinkspeed, mode, BLUE, false);
 }
 
+// generic routine to blink light while waiting for user to press one of the three OTA positions (moving the knob doesn't count)
 short pickPosition() {
   short blinkstate = LOW;
   short P = 0;

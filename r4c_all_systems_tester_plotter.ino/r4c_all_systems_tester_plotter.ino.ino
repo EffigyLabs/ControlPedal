@@ -1,33 +1,43 @@
-/*
+    /*
     Tester for Emprenda / multiple OTA devices
      continually read sensor a0, a1, and a2 and output to the debug com port.
      used to tune and position the OTAs, and record centering and maxing parameters.
     Output compatible with both plottter and serial monitor
 */
 #include <systemblock.h>
+#include <pedal.h>
+#include <ResponsiveAnalogRead.h> // input smoothing - Damien Clarke
 
 // set sensdelaymode to 0 to wait 0 ms between samples
 // set sensdelaymode to 1 to wait n ms between samples where n = value of the sensitivity knob.
 // set to > 1 to wait a fixed amount between samples
-int sensdelaymode = 1;
+int sensdelaymode = 0;
 int doblem = 0; // blink emitters
 
 long sample = 0;
-int modeSwitchPin = 6;      // mode switch button
+//int modeSwitchPin = 6;      // mode switch button
 int modeSwitchState = 0;
-int downSensorPin = A3;  // L OTA sensor input pin f7 for on breakout/leonardo
-int upSensorPin = A2;    // R OTA sensor input pin
-int pgmSensorPin = A1;   // Center OTA input pin
-int sensitivityPin = A0; // knob pin
+//int downSensorPin = A3;  // L OTA sensor input pin f7 for on breakout/leonardo
+//int upSensorPin = A2;    // R OTA sensor input pin
+//int pgmSensorPin = A1;   // Center OTA input pin
+//int sensitivityPin = A0; // knob pin
 
 //int sensorPowerPin = 1;   // power to voltage divider circuits for OTA sensors?
-int pedalLedPin = 2;      // ota emitters
+//int pedalLedPin = 2;      // ota emitters
+
+
+// input smoothing
+ResponsiveAnalogRead downSensorPin(pos1Pin, true,.1); // OTA1
+ResponsiveAnalogRead upSensorPin(pos2Pin, true,.1); // OTA2
+ResponsiveAnalogRead pgmSensorPin(pos3Pin, true,.1); // OTA3
+ResponsiveAnalogRead sensitivityPin(knobPin, true, .1); // Knob doesn't need snap adjust
+
 
 int pedalLedTimer = 1000;  // ms to wait
 unsigned long pedalLedCounterTimer;
 int commLedState; // 0 = off 1 = on
-int commLedPin = 3;       // comm led blue light
-int redLedPin = 9;       // comm led red light
+//int commLedPin = 3;       // comm led blue light
+//int redLedPin = 9;       // comm led red light
 int LEDtoggleState = 0;   // for toggling asynchronously
 int commLEDtoggleState = 1;   // for toggling asynchronously
 int redLEDtoggleState = 0;   // for toggling asynchronously
@@ -47,9 +57,6 @@ int wlarr2 = 0;
 
 void setup() {
   Serial.begin(9600); // comment this out and uncomment the midi rate when doing midi - use this for debugging //Serial.println()
-  while (!Serial) {
-    ; // wait
-  }
   pinMode(pedalLedPin, OUTPUT);
   pinMode(commLedPin, OUTPUT);
   pinMode(redLedPin, OUTPUT);
@@ -66,6 +73,12 @@ void setup() {
   blinkLED(redLedPin, 333, 3);
   LEDtoggleState = 1;
   //blinkLED(pedalLedPin,333,3);
+
+  
+    while (!Serial) {
+    ; // wait
+  }
+
   pedalLedCounterTimer = millis(); // initialize timer
 }
 
@@ -82,57 +95,77 @@ void loop() {
 
     switch (i) {
       case 0:
-        downSensorValue = analogRead(downSensorPin);
-        downSensorValue = analogRead(downSensorPin);
+        downSensorValue = analogRead(pos1Pin);
+        downSensorPin.update();
+        downSensorValue = downSensorPin.getValue();
+//        Serial.print("down=");
+//        Serial.println(downSensorValue);
+//        downSensorValue = analogRead(downSensorPin);
         break;
       case 1:
-        upSensorValue = analogRead(upSensorPin);
-        delay(1);
-        upSensorValue = analogRead(upSensorPin);
+        upSensorValue = analogRead(pos2Pin);
+        //delay(1);
+        upSensorPin.update();
+        upSensorValue = upSensorPin.getValue();
+//        upSensorValue = analogRead(upSensorPin);
         break;
       case 2:
-        pgmSensorValue = analogRead(pgmSensorPin);
-        pgmSensorValue = analogRead(pgmSensorPin);
+        pgmSensorValue = analogRead(pos3Pin);
+        pgmSensorPin.update();
+        pgmSensorValue = pgmSensorPin.getValue();
+
+//        pgmSensorValue = analogRead(pgmSensorPin);
         break;
       case 3:
-        sensitivityKnobValue = analogRead(sensitivityPin);
-        sensitivityKnobValue = analogRead(sensitivityPin);
+        sensitivityKnobValue = analogRead(knobPin);
+        sensitivityPin.update();
+        sensitivityKnobValue = sensitivityPin.getValue();
+//        Serial.print("knob=");
+//        Serial.println(sensitivityKnobValue);
+
+//        sensitivityKnobValue = analogRead(sensitivityPin);
         break;
       default:
         // statements
         break;
     }
   }
-
+ 
   wlarr2 = millis() - wlarr;
   if ((upSensorValue != last_upSensorValue) | (downSensorValue != last_downSensorValue) | (pgmSensorValue != last_pgmSensorValue)) {
+    //Serial.println("here!");
     //      Serial.print("s: ");
     //      Serial.print(sample++);
 
     //      Serial.print(" (");
     //      Serial.print(wlarr2);
     //      Serial.print(")");
-    Serial.print("\t d: ");
+    //Serial.print("\t d: ");
+    Serial.print("\t");
     Serial.print(downSensorValue);
     //      Serial.print(" (");
     //      Serial.print(starray[0][2]);
     //      Serial.print(")");
-    Serial.print("\t u: ");
+    Serial.print("\t");
+//    Serial.print("\t u: ");
     Serial.print(upSensorValue);
     //    Serial.print(" (");
     //    Serial.print(starray[1][2]);
     //    Serial.print(")");
-    Serial.print("\t c: ");
+    Serial.print("\t");
+//    Serial.print("\t c: ");
     Serial.print(pgmSensorValue);
     //    Serial.print(" (");
     //    Serial.print(starray[2][2]);
     //    Serial.print(")");
-    Serial.print("\t k: ");
+    Serial.print("\t");
+//    Serial.print("\t k: ");
     Serial.print(sensitivityKnobValue);
     //    Serial.print(" (");
     //    Serial.print(starray[3][2]);
     //    Serial.print("));
-    Serial.print("\tM: ");
+    Serial.print("\t");
+//    Serial.print("\tM: ");
     Serial.println(modeSwitchState);
 
     switch (sensdelaymode)  {
@@ -179,7 +212,7 @@ void blem() {
         commLedState = 0;
         break;
       default:
-        delay(0);
+        //delay(0);
         break;
     }
   }

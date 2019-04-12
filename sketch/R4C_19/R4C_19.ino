@@ -1,11 +1,12 @@
+     /* Control Program for the Effigy Labs Control Pedal
+    vR4C_19
+    */
     const static String ver = "R4C_19"; // Source of Record.  
-    //This is where we say the version for all.  this is the source for reporting the SWVER in the Control Panel and API
+    //This is where we say the version for all.  this is the source for reporting the SWVER in the CP and API
     const static byte bver = 19;
 
     /*   
-    Control Program for the Effigy Labs Control Pedal
-
-    last updated 20 Feb 2019
+    last updated 2 Feb 2019
     author: Jody Roberts
     All rights reserved, Effigy Labs LLC
     
@@ -15,8 +16,8 @@
 
    Program can be written as if the hardware were an Arduino Leonardo:
     ATMEGA32U4 MCU
-    26239 of 28672 bytes of program storage space
-    1799 of 2560 bytes of dynamic memory
+    25538 of 28672 bytes of program storage space
+    1740 of 2560 bytes of dynamic memory
     1K EEPROM,
     16Mhz external clock
     main control loop idles at around 450 Hz
@@ -24,15 +25,15 @@
    eeprom map in pedal.h
    
    Program high-level structure:
- 	 
- 	 global variables
+    
+   global variables
    
    setup()
- 		initialize
- 		calibrate
- 		load preset
- 		select mode
- 	loop()
+    initialize
+    calibrate
+    load preset
+    select mode
+  loop()
    
     read inputs
       pin map is reversed in pin number to ota inputs
@@ -107,24 +108,16 @@
      - when a preset is changed, if it is the live preset, the live preset is refreshed.
      - when a preset is changed, it is persisted into the system block and eeprom.
      - min/max implementation changed from operating on the input to the output. - R. Menzel
-     R4C_19 changes: February 2019
+     R4C_19 changes:
      - led phase color changes to red when knob is in 4th-position mode
      - added default gestural hold time for hold-and-set behavior in pedal.h
-     - moved versioning to source from pedal.h
-     - bug fix: save knob position when switching between controller and sensitivity mode
-     - bug fix: only send data when knob moves, once switched between controller and sensitivity mode - do not send data for new knob position until moved
-     - new button in the UI to copy one internal bank to another internal bank
-     - removed irrelevant dupe checking for the sensitivity-handing loops that don't need it. 
-     - constrained presetToLoad in a few places that may have inadvertently allowed a larger number to be entered.  Not sure if this caused the problem.  It is a bandaid at best, just saving behaviour of the pedal to at leasst a known preset, preset 5 if it's higher
-     - cleaned up debugging and commenting
-     - realizing this release is close to what a (hopefully) lot of people are going to see, I tried to remove most of the old remnants that don't make sense in this version.
-     - bug: sometimes the LED goes out, then reappears, after a mode switch.  appears to reappear when otas move (but didn't notice).  
-       Couldn't reporoduce on demand, seemed to be when mode switch had been waiting for a while, but may have been some activity 
-       occurring during when mode switch was active; api was being tested during these times, but not the api dealing with the mode switching, which is currently puzzling.  
-       Root cause TBD.  
-     R4C_20 changes: (future as of R4C_19)
+     - moved versioning to source from pedl.h
+     x bug fix: not saving knob position when switching between controller and sensitivity mode
+     x bug fix: only send data when knob moves, once switched between controller and sensitivity mode - do not send data for new knob position until moved
+      - new button in the UI to copy one internal bank to another internal bank
+     
+     R4C_20 changes:
      - add a new counter, number of times the mode switch has been consecutively depressed - works independently of timed gestures
-       - plumbing code has been written and commented out 
      - carousel mode for program changes
       - change min and max to be the program output not percents - so the program change ranges won't need mapping
       - add a curve type for a slot - carousel mode
@@ -146,10 +139,11 @@
 short cycleTimer = 0;
 unsigned long cycleTimerMillis;
 boolean msdep = false;  // Mode Switch Depressed.  This is turned on as long as the mode switch is depressed.  Counters and timers key off of this condition.
-short msDepCnt = 0; // uncomment to implement mode switch count gesture actions
 unsigned long mstimer = 0;
+//unsigned long secondcounter = 0;
 byte ticker = 0;
 unsigned long tickertimer = 0;
+//unsigned long loopctr = 0;
 
 // LED blink parameters
 short pickPositionblinkinterval = 100;     // indicator of ota picker cycle
@@ -185,13 +179,18 @@ short dwr = 0; // dynamic max working range for all otas, based on lowest upper 
 
 // latching
 boolean setOnce = false; // for condition of setting sensitivity from eeprom if knob controller enabled (otherwise sensitivity is obtained from knob)
-boolean knobMotionLatched = false; 
-short knobSavedPosition = 0;
+boolean knobMotionLatched = false; // testing 2/14/2019
+boolean knobCtlLatch = false;
+boolean knobSnsLatch = false;
+short knobSavedCtlPosition = 0; // testing 2/14/2019
+short knobSavedSnsPosition = 0; // testing 2/14/2019
+short knobSavedPosition = 0; // testing 2/14/2019
+
 
 // porch and ceiling, configurable size buffers on the ends of the working range
 // bigger value to porchSize sets the size of the smallest difference between the average (idle) of an OTA and it's lower limit trigger.
 // min size of non-activating motion added to max idle measurement
-short porchsize = 4; // for now, here, but eeprom overrides - defaulting from 5 to 4 on Feb 2019 changes because of observed increased precision and stability of OTA performance.
+short porchsize = 5; // for now, here, but eeprom overrides
 // ceiling = amount of buffer to give to the upper maximum value of operation.  the minimum max sensor value is the upper limit use to set dynamic working range (dwr).  This number is subtracted from the max.  Use zero for nothing, and more to increase the ceiling buffer size.
 short ceiling = 100; // default, this number is to avoid too much stiffness at the top, read from eeprom
 
@@ -248,7 +247,7 @@ unsigned long timecounter = 0;    // comm LED Phaser
 ResponsiveAnalogRead analogPos1Pin(pos1Pin, true,.1); // OTA1
 ResponsiveAnalogRead analogPos2Pin(pos2Pin, true,.1); // OTA2
 ResponsiveAnalogRead analogPos3Pin(pos3Pin, true,.1); // OTA3
-ResponsiveAnalogRead analogPos4Pin(knobPin, true,.1); // Knob gets same adjust - R4C_19 1/17/2019 - JR
+ResponsiveAnalogRead analogPos4Pin(knobPin, true,.1); // Knob gets same adjust - 1/17/2019 - JR
 
 // the third optional argument in the ResponsiveAnalogRead object above is snapMultiplier, which is set to 0.01 by default
 // you can pass it a value from 0 to 1 that controls the amount of easing
@@ -264,14 +263,14 @@ short mode = 0; // mode 1=1, 2=2, 3=3 do not count mode 0 as a mode, 0=mode unse
 midiEventPacket_t rx; //  for midiusb library, defines a packet to receive
 
 // midi command types - note on/off, etc. including cc and pitch
-byte static const MIDI_NOTEOFF          = 0x08;      // note off
-byte static const MIDI_NOTEON           = 0x09;      // note on
-byte static const MIDI_PKP_AFTERTOUCH   = 0x0A;      // polyphonic key pressure aftertouch
-byte static const MIDI_CHG              = 0x0B;      // midi change command - no channel
-byte static const MIDI_PGM_CHG          = 0x0C;      // program change
-byte static const MIDI_AFTERTOUCH       = 0x0D;      // channel pressure aftertouch
+byte static const MIDI_NOTEOFF          = 0x08; 
+byte static const MIDI_NOTEON           = 0x09; 
+byte static const MIDI_PKP_AFTERTOUCH   = 0x0A; // polyphonic key pressure aftertouch
+byte static const MIDI_CHG              = 0x0B;            // midi change command - no channel
+byte static const MIDI_PGM_CHG          = 0x0C;        // program change
+byte static const MIDI_AFTERTOUCH       = 0x0D;     // channel pressure aftertouch
 byte static const MIDI_PITCHBEND        = 0x0E;      // midi pitch bend
-//int static const MIDI_SYSEX             = 0x0F;      // not here
+//int static const MIDI_SYSEX             = 0x0F;        // not here
 
 // system configuration
 systemblock systemBlock;  // 1st 100 bytes of eeprom are reserved for system settings, leaving 924 bytes for presets.
@@ -300,7 +299,7 @@ struct Slot {
   byte MidiCmd : 4;
   byte MidiChannel : 4;
   byte MidiSubCommand: 7;
-  byte curvetype: 2;        // will need to expand to 3 bits to accommodate curve type carousel
+  byte curvetype: 2;
   byte curvedir: 1;
   byte minrange: 7;
   byte maxrange: 7;
@@ -324,9 +323,6 @@ struct Preset {
 
 // define the live preset containing the current operating configuration.
 Preset livePreset;
-#ifdef DEBUG
-// sizeof(livePreset);
-#endif
 byte presetSize;
 bool full_message_received = false;
 byte apimidicmd; // the API call number sent in the SysEx message representing which API function is being called.
@@ -356,7 +352,7 @@ void setup() {
   pinMode(pedalLedPin, OUTPUT);
   pinMode(commLedPin, OUTPUT);
   pinMode(redLedPin, OUTPUT);
-  digitalWrite(pedalLedPin, HIGH);  // turn on emitters
+  digitalWrite(pedalLedPin, HIGH);  // turn on emitters - give time to 'warm up'?
   analogWrite(redLedPin, HIGH);  // turn on red led lead
     
   delay(1600); // time for emitters and sensors to level - lower this at your own risk.  if strange behaviour happens, make sure there is time for everything to warm up
@@ -433,7 +429,7 @@ void setup() {
 #endif
   // load the live preset.
   // presets are stored in EEPROM starting at byte 100 and are 180 bytes long.  The preset number x the size, starting at byte 100, gives the address of that preset's data
-  EEPROM.get(sizeof(systemBlock) + (sizeof(livePreset) * systemBlock.presetToLoad), livePreset);
+  EEPROM.get(sizeof(systemBlock) + (sizeof(livePreset) * (systemBlock.presetToLoad)), livePreset);
   preset = systemBlock.presetToLoad; // 1/16/2018 - JR impl floating live preset and take away preset 0's specialness - it's the presettoload's one that does it.
 
   porchsize = systemBlock.porchsize; // set saved porch size
@@ -517,7 +513,7 @@ void readInputs() {
   analogPos4Pin.update();
   Inputs[3][VALUE_COL] = analogPos4Pin.getValue();
 
-  
+
 //  read with normal analogRead
 //  for (short i = 0; i < numberOfInputs; i++) {
 //    analogRead(Inputs[i][PIN_COL]); // flushing read
@@ -574,16 +570,20 @@ void generateOutputs() {
     // if knob mode was just switched back to controller mode, and knob has not moved since it was switched, do not output until the knob moves - 2/14/2019
     // if knob mode was just swtiched back to sensitivity mode, and knob has not moved since it was switched, do not adjust sensitivity until the knob moves - 2/14/2019
     
-    // new r4c_19_knobfix new knob processing - eventually replace all knob handling
+    // new r4c_19_knobfix knob processing - eventually replace all knob handling
     if(Inputs[pos][TYPE_COL] == 1) { // process the knob - we know it's the knob in the input array by it's type TYPE_COL=1
       
       // if we are latched, check to see if the knob has moved.  if it has, turn off the latch adn process normally.  Otherwise, don't process the knob.
       if(knobMotionLatched) { // if we are latched...
+        
         //if(pos == knobInput) {
-          
-          //Inputs[pos][VALUE_COL] = constrain(systemBlock.knobMaxValue - Inputs[pos][VALUE_COL], 0, systemBlock.knobMaxValue); // give inverted value
-
+          //Serial.println("p=k,inverting");
+         // Inputs[pos][VALUE_COL] = constrain(systemBlock.knobMaxValue - Inputs[pos][VALUE_COL], 0, systemBlock.knobMaxValue); // give inverted value
         //}
+
+        
+        //Serial.print("pv=");
+        //Serial.println(Inputs[pos][VALUE_COL]);
         if(Inputs[pos][VALUE_COL] != knobSavedPosition) {  // ...has the knob moved?
           /*
           Serial.print("unlatching v=");
@@ -596,7 +596,7 @@ void generateOutputs() {
       }
 
       // the knob value changes the working range of the other inputs (of type 0) dynamically:
-      boolean willChgFade = false;
+      boolean willChgSens = false;
   
       if(!knobMotionLatched) { // if not motion latched for any reason
         knobSavedPosition = Inputs[pos][VALUE_COL]; // this is the current knob position, save it since we are not latched
@@ -610,22 +610,25 @@ void generateOutputs() {
                 if ( abs(Inputs[k][UL_COL] - newUL) > 1  ) {
                   // if we're not quiesced from just switching and the newUL isn't the same as the last value, then do it
                   Inputs[k][UL_COL] = newUL; 
-                  willChgFade = true;
-                }
+                  willChgSens = true;
+                }            
                } // for each OTA
              } // set new uls
+            if(willChgSens) {
+              fadeOnSensitivity(Inputs[pos][VALUE_COL]); // repeated superfluously to save code to check.
+            }
 
-        // end adjust sensitivity for all the OTAs
+           // end adjust sensitivity for all the OTAs
         } else { // we're in controller mode
-            // just invert since we're the knob.  this is the actual inversion so the knob works correctly from left to right.  So matching expressions should do this too.
+            // just invert since we're the knob
             Inputs[pos][VALUE_COL] = constrain(systemBlock.knobMaxValue - Inputs[pos][VALUE_COL], 0, systemBlock.knobMaxValue); // give inverted value
-        
         }
-        if (willChgFade) {
-          willChgFade = false;
+        if (willChgSens) {
           fadeOnSensitivity(Inputs[pos][VALUE_COL]); // repeated superfluously to save code to check.
         }
         
+      } else {
+        // we are latched so don't do this
       }
 
     } // knob processing
@@ -692,7 +695,7 @@ void generateOutputs() {
         // don't sent an output at all if the slot is empty or if slot is zero-latched 
         if ( (livePreset.mode[modeIndex].pos[pos].slot[slot].MidiCmd == 0) || // slot is empty
              (latchlock == 1) // zero-latched lock
-             || ((pos == knobInput) && knobMotionLatched)
+             || ((pos == 3) && knobMotionLatched)
              // || (your additional conditions here)
              )    
              {
@@ -920,7 +923,7 @@ void generateOutputs() {
                     midval = 127; // such as sustain
                     //Serial.print("latching value to 127");
                   }
-
+ 
                 }
                 else {
                   // on-off latching for pitch bend, goes the whole way up or down
@@ -954,6 +957,7 @@ void generateOutputs() {
           // the variable midval will contain the current value about to be output.
           //////////////////////////////////////////////////////////
 
+
           //////////////////////////////////////////////////////////////////////////////////////
           // Doing nothing past this point without a good understanding of what is happening. //
           //////////////////////////////////////////////////////////////////////////////////////
@@ -976,11 +980,7 @@ void generateOutputs() {
 #endif
 
               lastVals[pos][slot] = midval;
-              // if the type of the input pos is 0, an OTA, then reset the timer the mode switch counter is watching
-              // uncomment this if to implement mode switch depress count gestural actions
-              //if(Inputs[pos][TYPE_COL] == 0) {
-              //  msDepCnt = 0;                
-              //}
+                              
               sendMidiOut(
                 livePreset.mode[modeIndex].pos[pos].slot[slot].MidiCmd, // midi cmd byte, B=CC, E=pitch, D=aftertouch, etc.
                 livePreset.mode[modeIndex].pos[pos].slot[slot].MidiChannel, // midi channel, 0 = channel 1
@@ -1057,7 +1057,7 @@ void updateAll() {
   handleMidiTraffic();
 
   // handle hold-and-latch timing for OTAs
-     //  handleHoldLatching();
+//  handleHoldLatching();
 }
 
 #ifdef DEBUG
@@ -1216,6 +1216,7 @@ void handleMidiTraffic() {
 } // end of handleMidiCmd
 
 
+void apiDispatcher(short apicmd) {
 
   /*
      Effigy Labs control pedal API Cmd List
@@ -1242,11 +1243,9 @@ void handleMidiTraffic() {
     short API_SET_PRESET_TO_LOAD = 19;
     short API_GET_SOFTWARE_VERSION = 20;
     short API_SET_KNOB_MODE = 21;
-    short API_REPORT_CURRENT_MODE = 22;
   //short API_FUTURE = 22;
 
   */
-void apiDispatcher(short apicmd) {
   switch (apicmd) {
 
     case 0:  { // load from eeprom and switch to preset
@@ -1273,8 +1272,6 @@ void apiDispatcher(short apicmd) {
 #endif
         Preset bufferPreset;
         EEPROM.get(sizeof(systemBlock) + (sizeof(livePreset) * sysexBuffer[5]), bufferPreset);
-        // bitmapped attributes e.g. MidiCmd naturally transform and truncate so WATCH IT.  If for example you give a value in curve direction > 4 it will not work becuase
-        // that is a 2-bit field and only the first 2 bits exist.  So the carousel curve type will have to wait until next slot change update - 2/16/2019
         switch (sysexBuffer[9]) {
           case 0:
               bufferPreset.mode[sysexBuffer[6]].pos[sysexBuffer[7]].slot[sysexBuffer[8]].MidiCmd = sysexBuffer[10];
@@ -1316,9 +1313,9 @@ void apiDispatcher(short apicmd) {
       break;
 
     case 2:  { // receive and save preset
-#ifdef DEBUG
+//#ifdef DEBUG
         Serial.print("rcv pre:");
-#endif
+//#endif
         savePreset(sysexBuffer[5], sysexBuffer, 6); // offset = 4 points to the data and skips the final sysex header:  last byte of the mma vendor id, + the api cmd, + the preset # arg of the cmd
         if (sysexBuffer[5] == preset) loadPreset(preset); // load live preset if changes were made to that preset
         full_message_received = true;
@@ -1582,9 +1579,13 @@ void apiDispatcher(short apicmd) {
         Serial.println(sysexBuffer[5]);
 #endif
 
+        short newUL = 0;
         for ( short k = 0; k < numberOfInputs; k++) { // hard coding just OTA sensitivity controlling now - knob doesn't control it's own sensitivity
           if (Inputs[k][TYPE_COL] == 0) { // it's an OTA so change the upper limit, also skip self as knob
-            Inputs[k][UL_COL] = Inputs[k][LL_COL] + constrain(map(sysexBuffer[5], 0, 100, 0, dwr), 1, dwr);
+            newUL = Inputs[k][LL_COL] + constrain(map(sysexBuffer[5], 0, 100, 0, dwr), 1, dwr);
+            if (!(Inputs[k][UL_COL] == newUL)) {
+              Inputs[k][UL_COL] = newUL; // adjust upper limit for each ota to be the same minimum range but starting from each ota's individual lower limit.
+            }
           }
         } // set new uls
 
@@ -1687,8 +1688,8 @@ void apiDispatcher(short apicmd) {
       break;
 
     case 16: { // change fademax - max brightness of LED
-    
-        absolutefademax = map(sysexBuffer[5], 0, 100, fademin, 32); // the absolute absolutefademax should be only 32.
+        
+        absolutefademax = map(sysexBuffer[5], 0, 100, fademin, 64);
         systemBlock.fademax = absolutefademax;
         fademax = systemBlock.fademax;  
         fadeOnSensitivity(fademax); // so what if we do this three times, we only do it when a value has changed.
@@ -1739,6 +1740,7 @@ void apiDispatcher(short apicmd) {
         //Serial.println(sysexBuffer[5]); // preset to send
 
         byte apiBytes[1] = {0x12}; // api command to send the pedal bank, all 5 presets
+        //int prestart = sysexBuffer[5]; // which preset to send
         Preset bufferPreset; // for incoming or outgoing presets vi api
         byte sendBuffer[sizeof(bufferPreset) + 1]; // put the api bytes in front of the preset bytes
         for (short bpr = 0; bpr < 5; bpr++) { // iterate through all presets
@@ -1777,6 +1779,7 @@ void apiDispatcher(short apicmd) {
               } // slot
             } // position
           } // mode
+          //delay(60);
           MidiUSB_sendSysex(sendBuffer, butPtr, apiBytes, sizeof(apiBytes));
 #ifdef DEBUG
           Serial.print("snt ");
@@ -1790,7 +1793,6 @@ void apiDispatcher(short apicmd) {
 
     case 19: { // set preset to load
       systemBlock.presetToLoad = sysexBuffer[5];
-      
       EEPROM.put(0,systemBlock);
 #ifdef DEBUG
       Serial.print("set PTL:");
@@ -1811,7 +1813,6 @@ void apiDispatcher(short apicmd) {
       full_message_received = true;
     break;
 
-    // save the given knob mode in the eeprom but do not switch to that mode right now.
     case 21: { // set knob mode
       systemBlock.knobControl = sysexBuffer[5];
       EEPROM.put(0,systemBlock);
@@ -1835,18 +1836,6 @@ void apiDispatcher(short apicmd) {
       full_message_received = true;
     break;
 
-/*
-    case 23: { // undefined API function TBD
-#ifdef DEBUG
-      Serial.println(mode);
-#endif
-      byte mb[] = {0x00,(byte) mode}; // global var mode is all
-      byte apiBytes[1] = {0x16}; // 16 is 22, self-affirming api return response
-      MidiUSB_sendSysex(mb, sizeof(mb), apiBytes, sizeof(apiBytes)); // global var mode is returned 
-    }
-      full_message_received = true;
-    break;
-*/
 
     
     default: {
@@ -1898,10 +1887,11 @@ void savePreset(short presetToSave, byte presetData[], short offset) {
   // any sysex footer is naturally ignored
   EEPROM.put(sizeof(systemBlock) + (presetToSave * presetSize), bufferPreset);
 
-  if (presetToSave == preset) {
+  // bug fix to avoid duplicate load and timouts during send bank - 4/10/2019
+  //if (presetToSave == preset) {
     // copy this preset to the livePreset preset
-    loadPreset(preset);
-  }
+  //  loadPreset(preset);
+  //}
 }
 
 
@@ -1933,7 +1923,7 @@ void loadPreset(short ptl) {
   } // mode
   
   preset = ptl; // set the currently active preset
-  systemBlock.presetToLoad = preset; // save this setting permanently in the eeprom - when you switch, it persists
+  systemBlock.presetToLoad = ptl; // save this setting permanently in the eeprom - when you switch, it persists
   EEPROM.put(0,systemBlock); // write system block to eeprom
 }
 
@@ -2268,9 +2258,8 @@ short pickPosition() {
       handleMidiTraffic(); 
       
   } while (P == 0);
-  analogWrite(redLedPin, LOW); // finish blinking the red part
-  //analogWrite(commLedPin, LOW); // finish blinking the red part
-  analogWrite(phaseLedPin, HIGH); // turn on whatever the color-of-the-knob-mode-we-are-in color
+  analogWrite(redLedPin, LOW);
+  analogWrite(phaseLedPin, HIGH);
 #ifdef DEBUG
   Serial.print("P=");
   Serial.println(P);
@@ -2356,11 +2345,14 @@ void handleModeSwitch() {
   analogRead(modeSwitchPin); // flushing read
   if (analogRead(modeSwitchPin) < 500) { // low state is something like 5 or 10 so for safety we say 500
     if (! msdep) { // switch is newly depressed
-      mstimer = millis(); // start the timer
+//      mstimer = millis(); // start the timer
       msdep = true;  // indicate the switch is down
 #ifdef DEBUG
-      Serial.print("ms dn 0.");
+//      Serial.print("ms dn 0.");
+
+//      Serial.print("M/D);
 #endif
+
       ticker = 0;
     }
     
@@ -2381,20 +2373,10 @@ void handleModeSwitch() {
     }
   } else { // switch was but now is not depressed
     if (msdep == true) { // but switch was depressed before so now we have an event
-      /*
-       // uncomment this out to implement mode-switch depress count gestural actions - 2/18/19
-      msDepCnt++;
-      switch(msDepCnt) {
-        case 2: { // program switch mode?
-            ; // 
-          break;
-        }
-      }
-      */
-      //Serial.print("switch released after ");
-      //Serial.print(ticker);
 #ifdef DEBUG
-      Serial.println("s");
+      Serial.print("M/U\t");
+      Serial.print(ticker);
+      //Serial.println("s");
 #endif
 
       // do stuff based on which timer was tripped here
@@ -2418,18 +2400,10 @@ void handleModeSwitch() {
             
             // set flag to not do anything until the knob actually moves
             knobMotionLatched = true; // testing 2/14/2019
-            if(systemBlock.knobControl == 0) {
-              Serial.println("knobControl == 0");
-              knobSavedPosition = Inputs[knobInput][VALUE_COL];            
-            } else {
-              Serial.println("knobControl == 1, inverting saved knob position");
-              knobSavedPosition = systemBlock.knobMaxValue - Inputs[knobInput][VALUE_COL]; // give inverted value                          
-            }
-            Serial.print("latching, ksp=");
-            Serial.println(knobSavedPosition);
-
             // save knob position 
-            //knobPrevPosition = Inputs[knobInput][VALUE_COL]; // testing 2/14/2019 - save for either to/from position
+            knobSavedPosition = Inputs[knobInput][VALUE_COL];
+            //Serial.print("latching, ksp=");
+            //Serial.println(knobSavedPosition);
 
             if ( systemBlock.knobControl == 0) { // was  in sensitivity mode so flipping from sens mode to controller mode, from red to blue
               phaseLedPin = commLedPin; // r4c_19 - sensitivty = phasing red
@@ -2443,8 +2417,10 @@ void handleModeSwitch() {
               setOnce = false; // tell sensitivity setter to use eeprom value while knob is also a controller
               // flip from knob to controller
               blinkCommLED(10, 1, RED, true);
-// knobMotionLatched = false;
+              // knobMotionLatched = false;
+            
             } else { // flipping from 1 to 0 (from controller to sensitivity mode) from blue to red
+              
               phaseLedPin = redLedPin; // goes back to blue no problem - r4c_19
               digitalWrite(commLedPin,LOW); // turn off other LED while blue LED phases - r4c_19
               // flip from controller to knob
@@ -2463,9 +2439,14 @@ void handleModeSwitch() {
               // so we don't overwrite knobCurrentValue with input current value yet - maybe - 2/14/2019
               //systemBlock.knobCurrentValue = Inputs[knobInput][VALUE_COL]; // save knob position value
               //systemBlock.knobbCurrentValue = whatever it was, don't reset it - the current value is saved above
-              // save knob position 
+              // save knob position - flip the ksp insteadof the value... 
               //knobSavedPosition = Inputs[knobInput][VALUE_COL]; // testing 2/14/2019 - save for switching from controller to sensitivity mode - save controller position
+               
+              knobSavedPosition = constrain(systemBlock.knobMaxValue - Inputs[knobInput][VALUE_COL], 0, systemBlock.knobMaxValue); // give inverted value
 
+              //Serial.print("setting ksp to ");
+              //Serial.println(knobSavedPosition);
+ 
               blinkCommLED(10, 1, RED, true);
             }
             EEPROM.put(0, systemBlock);
@@ -2556,6 +2537,7 @@ void phaseCommLED() {
     hbval += fadespeed;
     hbval = constrain(hbval, fademin, fademax);
     analogWrite(phaseLedPin, hbval);
+    //analogWrite(commLedPin, hbval);
   }
 }
 
@@ -2577,7 +2559,6 @@ void setSlotAttribute(short attr, short value) { // e.g. setSlotAttribute(MSP_CH
       for (short sl = 0; sl < numberOfSlots; sl++) { // slot looper
         switch (attr) {
           case 0: // MidiCmd
-          
             livePreset.mode[m].pos[sp].slot[sl].MidiCmd = value;
             break;
           case 1: // MidiChannel
@@ -2660,4 +2641,3 @@ void blinkCommLED(short time, short repetitions, short color, boolean bright) { 
     delay(time);
   }
 } //blinkCommLED
-
